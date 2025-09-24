@@ -1,16 +1,17 @@
 """The OpenRGB integration."""
+
 import asyncio
 import logging
 
-from openrgb import OpenRGBClient
-import voluptuous as vol
-
-from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
-from homeassistant.const import CONF_CLIENT_ID, CONF_HOST, CONF_PORT
 import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.const import CONF_CLIENT_ID, CONF_HOST, CONF_PORT
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.dispatcher import async_dispatcher_send, dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.exceptions import ConfigEntryNotReady
+
+from openrgb import OpenRGBClient
 
 from .const import (
     ATTR_PROFILE,
@@ -25,8 +26,8 @@ from .const import (
     ORGB_DISCOVERY_NEW,
     ORGB_TRACKER,
     SERVICE_FORCE_UPDATE,
-    SERVICE_PULL_DEVICES,
     SERVICE_LOAD_PROFILE,
+    SERVICE_PULL_DEVICES,
     SIGNAL_DELETE_ENTITY,
     SIGNAL_UPDATE_ENTITY,
     TRACK_INTERVAL,
@@ -52,19 +53,20 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+
 def autolog(message):
     "Automatically log the current function details."
     import inspect
+
     # Get the previous frame in the stack, otherwise it would
     # be this function!!!
     func = inspect.currentframe().f_back.f_code
     # Dump the message + the name of this function to the log.
-    _LOGGER.debug("%s: %s in %s:%i" % (
-        message, 
-        func.co_name, 
-        func.co_filename, 
-        func.co_firstlineno
-    ))
+    _LOGGER.debug(
+        "%s: %s in %s:%i"
+        % (message, func.co_name, func.co_filename, func.co_firstlineno)
+    )
+
 
 async def async_migrate_entry(hass, config_entry: ConfigEntry):
     """Migrate old entry."""
@@ -74,15 +76,22 @@ async def async_migrate_entry(hass, config_entry: ConfigEntry):
     new = {**config_entry.data}
 
     if config_entry.version == 1:
-        config_entry.unique_id = f'{DOMAIN}_{config_entry.data[CONF_HOST]}_{config_entry.data[CONF_PORT]}'
+        config_entry.unique_id = (
+            f"{DOMAIN}_{config_entry.data[CONF_HOST]}_{config_entry.data[CONF_PORT]}"
+        )
         update = True
 
     if update:
-        _LOGGER.info("Migration from version %s to %s successful", config_entry.version, CONFIG_VERSION)
+        _LOGGER.info(
+            "Migration from version %s to %s successful",
+            config_entry.version,
+            CONFIG_VERSION,
+        )
         config_entry.version = CONFIG_VERSION
         hass.config_entries.async_update_entry(config_entry, data=new)
 
     return True
+
 
 async def async_setup(hass, config):
     """Set up the OpenRGB integration."""
@@ -121,8 +130,8 @@ async def async_setup_entry(hass, entry):
     except ConnectionError as err:
         _LOGGER.error("Connection error during integration setup. Error: %s", err)
         raise ConfigEntryNotReady
-    except:
-        _LOGGER.debug("Connection error during integration setup.")
+    except Exception as err:
+        _LOGGER.debug("Error during integration setup. Error: %s", err)
         raise ConfigEntryNotReady
     autolog(">>>")
 
@@ -157,7 +166,7 @@ async def async_setup_entry(hass, entry):
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
-        "ha_dev_unique_id": f'{DOMAIN}_{entry.data[CONF_HOST]}_{entry.data[CONF_PORT]}',
+        "ha_dev_unique_id": f"{DOMAIN}_{entry.data[CONF_HOST]}_{entry.data[CONF_PORT]}",
         "online": True,
         ORGB_DATA: orgb,
         ORGB_TRACKER: None,
@@ -190,28 +199,41 @@ async def async_setup_entry(hass, entry):
 
             if entity_id not in hass.data[DOMAIN][entry.entry_id]["devices"]:
                 hass.data[DOMAIN][entry.entry_id]["devices"][entity_id] = []
-            
+
             # Stores the entire device as an entity
             if device_unique_id not in hass.data[DOMAIN][entry.entry_id]["entities"]:
                 hass.data[DOMAIN][entry.entry_id]["entities"][device_unique_id] = None
-            
+
             if CONF_ADD_LEDS in config and config[CONF_ADD_LEDS]:
                 # Stores each LED of the device as an entity
                 for led in device.leds:
                     led_unique_id = f"{device_unique_id}_led_{led.id}"
-                    if led_unique_id not in hass.data[DOMAIN][entry.entry_id]["entities"]:
-                        hass.data[DOMAIN][entry.entry_id]["entities"][led_unique_id] = None
+                    if (
+                        led_unique_id
+                        not in hass.data[DOMAIN][entry.entry_id]["entities"]
+                    ):
+                        hass.data[DOMAIN][entry.entry_id]["entities"][led_unique_id] = (
+                            None
+                        )
 
         for ha_type, dev_ids in device_type_list.items():
             config_entries_key = f"{ha_type}.openrgb"
 
-            if config_entries_key not in hass.data[DOMAIN][entry.entry_id][ENTRY_IS_SETUP]:
+            if (
+                config_entries_key
+                not in hass.data[DOMAIN][entry.entry_id][ENTRY_IS_SETUP]
+            ):
                 hass.data[DOMAIN][entry.entry_id]["pending"][ha_type] = dev_ids
                 await hass.config_entries.async_forward_entry_setups(entry, ["light"])
-                hass.data[DOMAIN][entry.entry_id][ENTRY_IS_SETUP].add(config_entries_key)
+                hass.data[DOMAIN][entry.entry_id][ENTRY_IS_SETUP].add(
+                    config_entries_key
+                )
             else:
                 async_dispatcher_send(
-                    hass, ORGB_DISCOVERY_NEW.format("light"), entry.entry_id, device_list
+                    hass,
+                    ORGB_DISCOVERY_NEW.format("light"),
+                    entry.entry_id,
+                    device_list,
                 )
 
         autolog(">>>")
@@ -264,19 +286,18 @@ async def async_setup_entry(hass, entry):
             # Clean up stale devices, or alert them that new info is available.
             if dev_id not in newlist_ids:
                 async_dispatcher_send(hass, SIGNAL_DELETE_ENTITY, dev_id)
-                
+
                 for led_id in hass.data[DOMAIN][entry.entry_id]["devices"][dev_id]:
                     async_dispatcher_send(hass, SIGNAL_DELETE_ENTITY, led_id)
 
                 hass.data[DOMAIN][entry.entry_id]["devices"].pop(dev_id)
             else:
                 async_dispatcher_send(hass, SIGNAL_UPDATE_ENTITY, dev_id)
-                
+
                 for led_id in hass.data[DOMAIN][entry.entry_id]["devices"][dev_id]:
                     async_dispatcher_send(hass, SIGNAL_UPDATE_ENTITY, led_id)
 
         autolog(">>>")
-
 
     hass.data[DOMAIN][entry.entry_id][ORGB_TRACKER] = async_track_time_interval(
         hass, async_poll_devices_update, TRACK_INTERVAL
@@ -294,7 +315,9 @@ async def async_setup_entry(hass, entry):
 
     async def async_load_profile(call):
         """Load profile in OpenRGB server."""
-        hass.data[DOMAIN][entry.entry_id][ORGB_DATA].load_profile(call.data[ATTR_PROFILE])
+        hass.data[DOMAIN][entry.entry_id][ORGB_DATA].load_profile(
+            call.data[ATTR_PROFILE]
+        )
 
     hass.services.async_register(
         DOMAIN,
@@ -311,9 +334,11 @@ async def async_setup_entry(hass, entry):
 
     return True
 
+
 async def _update_listener(hass, config_entry):
     """Update listener."""
     await hass.config_entries.async_reload(config_entry.entry_id)
+
 
 async def async_unload_entry(hass, entry):
     """Unloading the OpenRGB platforms."""
@@ -347,6 +372,7 @@ async def async_unload_entry(hass, entry):
     autolog(">>>")
 
     return unload_ok
+
 
 async def async_remove_config_entry_device(hass, config_entry, device_entry):
     """Remove a config entry from a device."""

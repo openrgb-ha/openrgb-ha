@@ -1,4 +1,5 @@
 """Helper functions for the OpenRGB Integration."""
+
 from openrgb.utils import DeviceType
 
 from homeassistant.components.light import ENTITY_ID_FORMAT

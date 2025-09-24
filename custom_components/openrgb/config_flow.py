@@ -1,7 +1,7 @@
 """Config flow for OpenRGB."""
+
 import asyncio
 import logging
-import socket
 
 from openrgb import OpenRGBClient
 import voluptuous as vol
@@ -10,7 +10,15 @@ from homeassistant import config_entries, exceptions
 from homeassistant.const import CONF_CLIENT_ID, CONF_HOST, CONF_PORT
 from homeassistant.core import callback
 
-from .const import CONF_ADD_LEDS, CONFIG_VERSION, CONN_TIMEOUT, DEFAULT_ADD_LEDS, DEFAULT_CLIENT_ID, DEFAULT_PORT, DOMAIN
+from .const import (
+    CONF_ADD_LEDS,
+    CONFIG_VERSION,
+    CONN_TIMEOUT,
+    DEFAULT_ADD_LEDS,
+    DEFAULT_CLIENT_ID,
+    DEFAULT_PORT,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +35,7 @@ def _try_connect(_host, _port, _client_id):
         raise CannotConnect from exc
 
     return True
+
 
 @config_entries.HANDLERS.register(DOMAIN)
 class OpenRGBFlowHandler(config_entries.ConfigFlow):
@@ -74,11 +83,13 @@ class OpenRGBFlowHandler(config_entries.ConfigFlow):
 
             try:
                 await asyncio.wait_for(
-                    self.hass.async_add_executor_job(_try_connect, self._host, self._port, self._client_id),
+                    self.hass.async_add_executor_job(
+                        _try_connect, self._host, self._port, self._client_id
+                    ),
                     timeout=CONN_TIMEOUT,
                 )
 
-                await self.async_set_unique_id(f'{DOMAIN}_{self._host}_{self._port}')
+                await self.async_set_unique_id(f"{DOMAIN}_{self._host}_{self._port}")
                 self._abort_if_unique_id_configured()
 
                 return self.async_create_entry(
@@ -116,10 +127,24 @@ class OpenRGBOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         """Init OpenRGBOptionsFlowHandler."""
         self._errors = {}
-        self._host = config_entry.data[CONF_HOST] if CONF_HOST in config_entry.data else None
-        self._port = config_entry.data[CONF_PORT] if CONF_PORT in config_entry.data else DEFAULT_PORT
-        self._client_id = config_entry.data[CONF_CLIENT_ID] if CONF_CLIENT_ID in config_entry.data else DEFAULT_CLIENT_ID
-        self._add_leds = config_entry.data[CONF_ADD_LEDS] if CONF_ADD_LEDS in config_entry.data else DEFAULT_ADD_LEDS
+        self._host = (
+            config_entry.data[CONF_HOST] if CONF_HOST in config_entry.data else None
+        )
+        self._port = (
+            config_entry.data[CONF_PORT]
+            if CONF_PORT in config_entry.data
+            else DEFAULT_PORT
+        )
+        self._client_id = (
+            config_entry.data[CONF_CLIENT_ID]
+            if CONF_CLIENT_ID in config_entry.data
+            else DEFAULT_CLIENT_ID
+        )
+        self._add_leds = (
+            config_entry.data[CONF_ADD_LEDS]
+            if CONF_ADD_LEDS in config_entry.data
+            else DEFAULT_ADD_LEDS
+        )
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
@@ -144,7 +169,9 @@ class OpenRGBOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             try:
                 await asyncio.wait_for(
-                    self.hass.async_add_executor_job(_try_connect, self._host, self._port, self._client_id),
+                    self.hass.async_add_executor_job(
+                        _try_connect, self._host, self._port, self._client_id
+                    ),
                     timeout=CONN_TIMEOUT,
                 )
 
@@ -169,6 +196,7 @@ class OpenRGBOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(data_schema),
             errors=self._errors,
         )
+
 
 class CannotConnect(exceptions.HomeAssistantError):
     """Error to indicate we can not connect."""

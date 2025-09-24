@@ -1,22 +1,26 @@
 """Platform for OpenRGB Integration."""
+
 import logging
 
-from openrgb import utils as RGBUtils
+import homeassistant.util.color as color_util
 
 # Import the device class from the component that you want to support
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_EFFECT,
     ATTR_HS_COLOR,
-    DOMAIN as SENSOR_DOMAIN,
     ColorMode,
-    LightEntityFeature,
     LightEntity,
+    LightEntityFeature,
+)
+from homeassistant.components.light import (
+    DOMAIN as SENSOR_DOMAIN,
 )
 from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers import entity_registry as er
-import homeassistant.util.color as color_util
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+from openrgb import utils as RGBUtils
 
 from .const import (
     CONF_ADD_LEDS,
@@ -32,6 +36,7 @@ from .helpers import orgb_entity_id, orgb_icon, orgb_object_id, orgb_tuple
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up OpenRGB devices dynamically."""
 
@@ -45,7 +50,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             hass,
             config_entry.entry_id,
             dev_ids,
-            config_entry.data[CONF_ADD_LEDS] if CONF_ADD_LEDS in config_entry.data else False,
+            config_entry.data[CONF_ADD_LEDS]
+            if CONF_ADD_LEDS in config_entry.data
+            else False,
         )
         async_add_entities(entities, True)
 
@@ -72,14 +79,28 @@ def _setup_entities(hass, entry_id, dev_ids, add_leds):
             device_unique_id = entity_id
 
         if not hass.data[DOMAIN][entry_id]["entities"].get(device_unique_id, None):
-            entities.append(OpenRGBDevice(hass, ha_dev_unique_id, entry_id, dev_id, device_unique_id))
+            entities.append(
+                OpenRGBDevice(
+                    hass, ha_dev_unique_id, entry_id, dev_id, device_unique_id
+                )
+            )
 
         if add_leds:
             for led in dev_id.leds:
                 led_unique_id = f"{device_unique_id}_led_{led.id}"
                 if not hass.data[DOMAIN][entry_id]["entities"].get(led_unique_id, None):
-                    entities.append(OpenRGBLed(hass, ha_dev_unique_id, entry_id, dev_id, led.id, led_unique_id))
+                    entities.append(
+                        OpenRGBLed(
+                            hass,
+                            ha_dev_unique_id,
+                            entry_id,
+                            dev_id,
+                            led.id,
+                            led_unique_id,
+                        )
+                    )
     return entities
+
 
 class OpenRGBLight(LightEntity):
     """Representation of a OpenRGB Device."""
@@ -105,15 +126,12 @@ class OpenRGBLight(LightEntity):
     def object_id(self):
         """Return the OpenRGB id."""
         return orgb_object_id(self._light)
-    
+
     @property
     def device_info(self):
         return {
             "identifiers": {
-                (
-                    DOMAIN, 
-                    f'{self._ha_dev_id}_{orgb_entity_id(self._light)}'
-                )
+                (DOMAIN, f"{self._ha_dev_id}_{orgb_entity_id(self._light)}")
             },
             "name": self._light.name,
             "manufacturer": self._light.metadata.vendor,
@@ -145,12 +163,12 @@ class OpenRGBLight(LightEntity):
     def brightness(self):
         """Return the brightness of this light between 0..255."""
         return self._brightness
-    
+
     @property
     def color_mode(self):
         """Return the color mode of the light."""
         return ColorMode.HS
-    
+
     @property
     def supported_color_modes(self):
         """Return a set of supported color modes."""
@@ -178,7 +196,9 @@ class OpenRGBLight(LightEntity):
 
         # Restore the state if the light just gets turned on
         if not kwargs:
-            self._brightness = 255.0 if self._prev_brightness == 0.0 else self._prev_brightness
+            self._brightness = (
+                255.0 if self._prev_brightness == 0.0 else self._prev_brightness
+            )
             self._hs_value = self._prev_hs_value
 
         self._device_turned_on(**kwargs)
@@ -230,9 +250,7 @@ class OpenRGBLight(LightEntity):
     async def _delete_callback(self, dev_id):
         """Remove this entity."""
         if dev_id == self.entity_id:
-            entity_registry = (
-                er.async_get(self.hass)
-            )
+            entity_registry = er.async_get(self.hass)
             if entity_registry.async_is_registered(self._attr_unique_id):
                 entity_registry.async_remove(self._attr_unique_id)
             else:
@@ -241,6 +259,7 @@ class OpenRGBLight(LightEntity):
     @callback
     async def _update_callback(self, dev_id=None):
         self.async_schedule_update_ha_state(True)
+
 
 class OpenRGBDevice(OpenRGBLight):
     """Representation of an OpenRGB Device."""
@@ -251,7 +270,7 @@ class OpenRGBDevice(OpenRGBLight):
         self._light = light
         self._callbacks = []
         self._unique_id = unique_id
-        self._attr_unique_id = f'{ha_dev_unique_id}_{unique_id}'
+        self._attr_unique_id = f"{ha_dev_unique_id}_{unique_id}"
         self._name = self._retrieve_current_name()
 
         self._brightness = 255.0
@@ -267,10 +286,12 @@ class OpenRGBDevice(OpenRGBLight):
 
         self._state = True
         self._assumed_state = True
-        
+
     async def async_added_to_hass(self):
         """Call when entity is added to hass."""
-        self.hass.data[DOMAIN][self._entry_id]["entities"][self._unique_id] = self._attr_unique_id
+        self.hass.data[DOMAIN][self._entry_id]["entities"][self._unique_id] = (
+            self._attr_unique_id
+        )
         self._callbacks.append(
             async_dispatcher_connect(
                 self.hass, SIGNAL_DELETE_ENTITY, self._delete_callback
@@ -348,7 +369,9 @@ class OpenRGBDevice(OpenRGBLight):
         super().update()
 
         self._effect = self._light.modes[self._light.active_mode].name
-        self._effects = [mode.name for mode in self._light.modes if mode.name != EFFECT_OFF]
+        self._effects = [
+            mode.name for mode in self._light.modes if mode.name != EFFECT_OFF
+        ]
 
         # If the effect is Off, the light is off
         if self._effect == EFFECT_OFF:
@@ -373,6 +396,7 @@ class OpenRGBDevice(OpenRGBLight):
         except ConnectionError:
             self.hass.data[DOMAIN][self._entry_id]["connection_failed"]()
 
+
 class OpenRGBLed(OpenRGBLight):
     """Representation of a LED from an OpenRGB Device."""
 
@@ -383,9 +407,9 @@ class OpenRGBLed(OpenRGBLight):
         self._callbacks = []
         self._led_id = led_id
         self._unique_id = unique_id
-        self._attr_unique_id = f'{ha_dev_unique_id}_{unique_id}'
+        self._attr_unique_id = f"{ha_dev_unique_id}_{unique_id}"
         self._name = self._retrieve_current_name()
-        _LOGGER.debug ("led name: %s", self._name)
+        _LOGGER.debug("led name: %s", self._name)
 
         self._brightness = 255.0
         self._prev_brightness = 255.0
@@ -399,7 +423,9 @@ class OpenRGBLed(OpenRGBLight):
     async def async_added_to_hass(self):
         """Call when entity is added to hass."""
 
-        self.hass.data[DOMAIN][self._entry_id]["entities"][self._unique_id] = self._attr_unique_id
+        self.hass.data[DOMAIN][self._entry_id]["entities"][self._unique_id] = (
+            self._attr_unique_id
+        )
         self._callbacks.append(
             async_dispatcher_connect(
                 self.hass, SIGNAL_DELETE_ENTITY, self._delete_callback
@@ -435,7 +461,9 @@ class OpenRGBLed(OpenRGBLight):
         return f"{self._light.name} {self._light.device_id} {self._light.leds[self._led_id].name}"
 
     def _retrieve_current_hsv_color(self) -> tuple[float, float, float]:
-        return color_util.color_RGB_to_hsv(*orgb_tuple(self._light.colors[self._led_id]))
+        return color_util.color_RGB_to_hsv(
+            *orgb_tuple(self._light.colors[self._led_id])
+        )
 
     def _set_color(self):
         """Set the devices color using the library."""
