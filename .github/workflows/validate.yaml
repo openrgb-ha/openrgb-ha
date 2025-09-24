@@ -1,24 +1,26 @@
 name: validate
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
   push:
     branches:
       - master
   pull_request:
     branches:
       - master
-  schedule:
-    - cron: "0 0 * * *"
-
-permissions:
-  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hacs/action@main
+      - uses: actions/checkout@v5
+
+      # https://github.com/home-assistant/actions/commits/master/hassfest
+      - uses: home-assistant/actions/hassfest@26d56ed1a1cbfeabf59feb7b26e368e13f47ef52
+
+      # https://github.com/hacs/action/commits/main
+      - uses: hacs/action@885037da508419fd08c13515967aec868dfdee2d
         with:
           category: integration
-      - uses: home-assistant/actions/hassfest@master
