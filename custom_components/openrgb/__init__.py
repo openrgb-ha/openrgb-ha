@@ -60,7 +60,10 @@ def autolog(message):
 
     # Get the previous frame in the stack, otherwise it would
     # be this function!!!
-    func = inspect.currentframe().f_back.f_code
+    frame = inspect.currentframe()
+    if frame is None or frame.f_back is None:
+        return
+    func = frame.f_back.f_code
     # Dump the message + the name of this function to the log.
     _LOGGER.debug(
         "%s: %s in %s:%i"
