@@ -7,7 +7,7 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_CLIENT_ID, CONF_HOST, CONF_PORT
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send, dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -315,9 +315,12 @@ async def async_setup_entry(hass, entry):
 
     async def async_load_profile(call):
         """Load profile in OpenRGB server."""
-        hass.data[DOMAIN][entry.entry_id][ORGB_DATA].load_profile(
-            call.data[ATTR_PROFILE]
-        )
+        try:
+            hass.data[DOMAIN][entry.entry_id][ORGB_DATA].load_profile(
+                call.data[ATTR_PROFILE]
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to load profile: {err}")
 
     hass.services.async_register(
         DOMAIN,
