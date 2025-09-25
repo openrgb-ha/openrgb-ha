@@ -3,12 +3,12 @@
 import asyncio
 import logging
 
-from openrgb import OpenRGBClient
 import voluptuous as vol
-
 from homeassistant import config_entries, exceptions
 from homeassistant.const import CONF_CLIENT_ID, CONF_HOST, CONF_PORT
 from homeassistant.core import callback
+
+from openrgb import OpenRGBClient
 
 from .const import (
     CONF_ADD_LEDS,
